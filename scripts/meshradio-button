@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Hold-to-talk. The microphone pipeline runs only while the button is held.
+
+Reads /etc/meshradio/station.conf. Wire the button between BUTTON_GPIO and
+ground; the internal pull-up is used, so no resistor is needed.
+"""
+import os
+import signal
+import subprocess
+import sys
+
+from gpiozero import Button
+
+CONF = os.environ.get("MESHRADIO_CONF", "/etc/meshradio/station.conf")
+
+
+def read_conf(path):
+    conf = {}
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                conf[key] = value.strip('"')
+    return conf
+
+
+conf = read_conf(CONF)
+port = conf.get("RTP_PORT", "5000")
+pipeline = [
+    "gst-launch-1.0", "-q", "-e",
+    "alsasrc", f"device={conf['AUDIO_IN']}",
+    "!", "audioconvert", "!", "audioresample",
+    "!", "audio/x-raw,format=S16BE,rate=48000,channels=1",
+    "!", "rtpL16pay",
+    "!", "udpsink", f"host={conf['NEXT_HOP_IP']}", f"port={port}",
+]
+talking = None
+
+
+def start():
+    global talking
+    if talking is None:
+        talking = subprocess.Popen(pipeline)
+
+
+def stop():
+    global talking
+    if talking is not None:
+        talking.terminate()
+        talking.wait()
+        talking = None
+
+
+button = Button(int(conf.get("BUTTON_GPIO", "17")), pull_up=True, bounce_time=0.05)
+button.when_pressed = start
+button.when_released = stop
+
+signal.signal(signal.SIGTERM, lambda *_: (stop(), sys.exit(0)))
+signal.pause()

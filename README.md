@@ -12,7 +12,7 @@ A relay station for the Station of Commons installation at ZKM. Each station is 
 
 The same module is built five times for the pilot. Every station runs the same software, and only a short config file differs.
 
-> **Status:** early development. Everything under "Test the audio hardware" and "Stream audio between two Pis" was tested on the bench. The ring relay, the mesh and the button are designs that have not been tested yet, and they are marked as such below.
+> **Status:** early development. Audio streaming between two Pis and the batman-adv mesh on two Pis were tested on the bench (see [`docs/test-log.md`](docs/test-log.md)). The ring relay, the button and the systemd services are written but not tested yet, and they are marked as such below.
 
 ## Two rules of the piece
 
@@ -58,7 +58,7 @@ A cluster of stations that all hear each other produces a lot of overlapping rad
 |---|---|
 | Raspberry Pi 5 (or 4) | Pi 5 has no analog audio jack, so it needs a USB audio device or a HAT |
 | Audio in and out | One of the options below |
-| USB Wi-Fi dongle, Atheros AR9271 | The Pi 5's onboard Wi-Fi is unreliable in ad-hoc mode. The Olimex MOD-WIFI-AR9271 uses the right chipset. Avoid TP-Link TL-WN722N unless it is v1 |
+| Wi-Fi | The onboard Wi-Fi of the Pi 5 joined the batman-adv mesh in ad-hoc mode in our two-Pi test (see `docs/test-log.md`). Range has not been tested. A USB dongle with an Atheros AR9271 chipset (Olimex MOD-WIFI-AR9271) is the fallback if range is poor. Avoid TP-Link TL-WN722N unless it is v1 |
 | Push button | Momentary, normally open |
 | Directional speaker and amp | To be decided |
 | microSD card and USB-C power supply | |
@@ -75,9 +75,24 @@ A cluster of stations that all hear each other produces a lot of overlapping rad
 
 Wire the button between a GPIO pin and ground. No resistor is needed, because the internal pull-up is enabled in software. Use `gpiozero`, not `RPi.GPIO`, which does not work correctly on Pi 5.
 
-## Setup
+## Install
 
-Requires a Raspberry Pi 5 or 4 running Raspberry Pi OS Trixie.
+On a Raspberry Pi 4 or 5 running Raspberry Pi OS Trixie:
+
+```bash
+git clone https://github.com/StationofCommons/MeshRadio.git
+cd MeshRadio
+./install.sh
+```
+
+The installer detects the Pi model, asks for the station number (1 to 5), then installs the packages, the scripts in `scripts/`, the systemd units in `systemd/` and the station config. Options: `--station N`, `--yes`, `--enable-services` (mesh, relay and button at boot), `--force` (other models) and `--dry-run`.
+
+Starting the mesh at boot takes the Wi-Fi away from normal use, so keep Ethernet or a console connected while you work on a station.
+
+Status of the installed pieces: the packages, config and mesh script were tested on a Pi 5. The relay and button services have not been run on a ring yet. The installer itself has only been run in `--dry-run` mode.
+
+## Manual setup
+
 
 ### 1. Install GStreamer
 
@@ -147,13 +162,15 @@ gst-launch-1.0 udpsrc port=5000 \
 
 Not done yet: an `audiomixer` that combines the local microphone with the incoming relay, so one station can both speak and relay.
 
-## Mesh network (planned, untested)
+## Mesh network (tested on two Pis)
 
-batman-adv on a USB Wi-Fi dongle in ad-hoc mode, with a fixed IP on `bat0` for each station (for example 10.0.0.1 to 10.0.0.5). Test one Pi 5, one dongle and batman-adv before building five.
+batman-adv runs on the onboard Wi-Fi in ad-hoc (IBSS) mode, with a fixed IP on `bat0` for each station (10.0.0.1 to 10.0.0.5). We use the default routing algorithm, **BATMAN_IV**. BATMAN_V is available in the kernel and has not been tried.
 
-## Configuration (planned)
+Bring it up by hand with `sudo meshradio-mesh-up up`, and undo it with `sudo meshradio-mesh-up down`. `install.sh` can also start it at boot. Results of the two-Pi test are in [`docs/test-log.md`](docs/test-log.md). Three or more stations, range and the two-way mic are not tested yet.
 
-Each station reads a small config file. Only these values differ between stations:
+## Configuration
+
+`install.sh` writes `/etc/meshradio/station.conf`. Only the station number and the addresses derived from it differ between stations:
 
 ```
 STATION_ID=1
@@ -161,15 +178,18 @@ MESH_IP=10.0.0.1
 NEXT_HOP_IP=10.0.0.2
 ```
 
-Station 5 points back to station 1. This makes it possible to build one SD card image and clone it for all five stations.
+The file also holds the mesh name and channel, the audio devices (detected, USB preferred), the jitter buffer, the per-hop volume and the button pin.
+
+Station 5 points back to station 1. Run `install.sh` on each Pi with its own number.
 
 ## To do
 
-- [ ] Choose and test the audio hardware on a Pi 5
-- [ ] batman-adv mesh on two Pis, then five
+- [ ] Choose the audio hardware (EVO 4 works on a Pi 5; cheaper options untested)
+- [x] batman-adv mesh on two Pis
+- [ ] batman-adv mesh on three Pis, then five, with range tests
 - [ ] Raw RTP pipeline with `audiomixer` and per-hop volume
 - [ ] Button script with `gpiozero`: hold to talk, with the pipeline running only while held
-- [ ] systemd services so each station starts on boot, with a restart watchdog
-- [ ] `install.sh` and a config file for cloning stations
+- [ ] Test the systemd services on a station (written, not run)
+- [x] `install.sh` and a config file for cloning stations (dry-run only, not yet run on a station)
 - [ ] Calibrate the delay on site at ZKM
 - [ ] Choose the directional speaker and amp

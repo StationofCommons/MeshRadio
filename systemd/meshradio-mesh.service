@@ -1,0 +1,13 @@
+[Unit]
+Description=MeshRadio batman-adv mesh
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/meshradio-mesh-up up
+ExecStop=/usr/local/bin/meshradio-mesh-up down
+
+[Install]
+WantedBy=multi-user.target

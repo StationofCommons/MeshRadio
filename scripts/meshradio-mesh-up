@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Join or leave the MeshRadio batman-adv mesh on the Wi-Fi interface.
+#   meshradio-mesh-up up     put wlan0 in ad-hoc mode, add it to bat0, set the mesh IP
+#   meshradio-mesh-up down   undo it and hand wlan0 back to NetworkManager
+# Settings come from /etc/meshradio/station.conf.
+set -euo pipefail
+
+CONF="${MESHRADIO_CONF:-/etc/meshradio/station.conf}"
+
+if [ "$(id -u)" -ne 0 ]; then
+  exec sudo "$0" "$@"
+fi
+
+# shellcheck disable=SC1090
+source "$CONF"
+: "${WIFI_IF:=wlan0}" "${MESH_SSID:=meshradio}" "${MESH_FREQ:=2412}"
+: "${MESH_BSSID:=02:CA:FF:EE:BA:BE}"
+
+case "${1:-up}" in
+  up)
+    rfkill unblock wifi || true
+    nmcli device set "$WIFI_IF" managed no || true
+    ip link set "$WIFI_IF" down
+    iw dev "$WIFI_IF" set type ibss
+    ip link set "$WIFI_IF" up
+    iw dev "$WIFI_IF" set power_save off || true
+    iw dev "$WIFI_IF" ibss join "$MESH_SSID" "$MESH_FREQ" fixed-freq "$MESH_BSSID"
+    modprobe batman-adv
+    batctl meshif bat0 interface add "$WIFI_IF" || true
+    ip link set up dev bat0
+    ip addr replace "$MESH_IP/24" dev bat0
+    echo "Mesh up: $MESH_SSID on $WIFI_IF, bat0 = $MESH_IP"
+    ;;
+  down)
+    ip addr flush dev bat0 2>/dev/null || true
+    batctl meshif bat0 interface del "$WIFI_IF" 2>/dev/null || true
+    iw dev "$WIFI_IF" ibss leave 2>/dev/null || true
+    ip link set "$WIFI_IF" down
+    iw dev "$WIFI_IF" set type managed
+    nmcli device set "$WIFI_IF" managed yes || true
+    ip link set "$WIFI_IF" up
+    echo "Mesh down: $WIFI_IF is back under NetworkManager"
+    ;;
+  *)
+    echo "Usage: $0 up|down" >&2
+    exit 1
+    ;;
+esac
