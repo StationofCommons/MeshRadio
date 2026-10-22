@@ -34,6 +34,24 @@ The same module is built five times for the pilot. Every station runs the same s
 - Each hop lowers the volume of the relayed signal (about 0.85), so a voice fades after a few trips round the ring.
 - The stations find each other with **batman-adv**, a layer 2 mesh. There is no router and no internet. batman-adv only moves packets. It does not decide which station's audio goes where.
 
+## How the mesh works
+
+No Pi hosts the network and no Pi connects to a "closest" Pi. All the stations use the same Wi-Fi network name and channel in ad-hoc (IBSS) mode, so they join one shared network. There is no router and no access point.
+
+- **Every station sends, receives and relays.** Any station within radio range hears the others directly.
+- **No station owns the network.** If the first one to start is switched off, the others carry on.
+- **batman-adv chooses the route.** For each destination it picks the best neighbour to hand a packet to, based on how many of that node's broadcasts arrive through each one. If a link gets weak, it moves traffic to another route.
+- **Stations are identified by MAC address.** batman-adv works below IP, on the MAC of each station's Wi-Fi interface. The IPs on `bat0` (10.0.0.1 to 10.0.0.5) are only there so GStreamer has an address to send to.
+- **GStreamer doesn't know about the mesh.** Station 1 sends to station 2's IP. If station 2 is in range, the audio goes straight there. If not, batman-adv carries it through another station.
+
+```
+  Station 1 --- Station 2 --- Station 3     Station 1 to 3 goes through
+      \                          /          station 2 if they can't hear
+       \---- Station 4 ---------/           each other directly
+```
+
+A cluster of stations that all hear each other produces a lot of overlapping radio traffic. A spread-out chain has fewer direct links and more hops, which adds delay and jitter.
+
 ## Hardware (per station)
 
 | Part | Notes |
