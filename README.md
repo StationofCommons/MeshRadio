@@ -51,12 +51,11 @@ The same module is built five times for the pilot. Every station runs the same s
 |---|---|---|---|---|
 | Creative Sound Blaster Play! 3 (USB) | 3.5 mm mono mic | two 3.5 mm | untested | About CHF 18. Check the mic level and noise |
 | Audient EVO 4 (USB) | XLR or TRS combo | headphone and monitor | untested | Class-compliant. Expensive for five stations |
-| ReSpeaker 2-Mics Pi HAT **v2.0** | two onboard mics | 3.5 mm and speaker | documented | Needs a device tree overlay built by hand. v1 does not work on Pi 5 |
 | UGREEN USB audio adapter | 3.5 mm | 3.5 mm | forum reports say yes | Plug and play |
 
 ### Button
 
-Wire the button between a GPIO pin and ground. No resistor is needed, because the internal pull-up is enabled in software. Use `gpiozero`, not `RPi.GPIO`, which does not work correctly on Pi 5. If you use the ReSpeaker HAT, keep clear of the GPIO pins it uses.
+Wire the button between a GPIO pin and ground. No resistor is needed, because the internal pull-up is enabled in software. Use `gpiozero`, not `RPi.GPIO`, which does not work correctly on Pi 5.
 
 ## Setup
 
