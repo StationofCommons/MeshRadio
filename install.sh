@@ -135,11 +135,14 @@ detect_card() {
 
 IN_CARD="$(detect_card arecord)"
 OUT_CARD="$(detect_card aplay)"
+# Without a USB card, card 0 on a Pi 5 is HDMI, which has no microphone.
+# Use ALSA's default device instead of guessing, and say so.
+if [ -n "$IN_CARD" ]; then AUDIO_IN="plughw:$IN_CARD,0"; else AUDIO_IN="default"; fi
+if [ -n "$OUT_CARD" ]; then AUDIO_OUT="plughw:$OUT_CARD,0"; else AUDIO_OUT="default"; fi
 if [ -z "$IN_CARD" ] || [ -z "$OUT_CARD" ]; then
-  echo "Warning: no USB audio device found. Plug one in and edit AUDIO_IN and AUDIO_OUT in $CONF_FILE."
+  echo "Warning: no USB audio device found, so AUDIO_IN and AUDIO_OUT are set to 'default'."
+  echo "Plug in the sound card, then set them in $CONF_FILE (see 'arecord -l' and 'aplay -l')."
 fi
-AUDIO_IN="plughw:${IN_CARD:-0},0"
-AUDIO_OUT="plughw:${OUT_CARD:-0},0"
 
 # --- Station config ----------------------------------------------------------
 CONF_TEXT="$(cat <<CONF
@@ -198,7 +201,7 @@ if [ "$ENABLE_SERVICES" -ne 1 ] && [ "$ASSUME_YES" -ne 1 ]; then
   echo "Starting the mesh at boot takes the Wi-Fi away from normal use."
   echo "Keep Ethernet or a console connected, or you will lose SSH."
   read -r -p "Start the mesh, relay and button at boot? [y/N] " answer
-  [[ "$answer" =~ ^[Yy]$ ]] && ENABLE_SERVICES=1
+  if [[ "$answer" =~ ^[Yy]$ ]]; then ENABLE_SERVICES=1; fi
 fi
 if [ "$ENABLE_SERVICES" -eq 1 ]; then
   run sudo systemctl enable meshradio-mesh meshradio-relay meshradio-button
@@ -213,5 +216,7 @@ else
   echo "  sudo meshradio-mesh-up up       # and 'down' to undo it"
   echo "  meshradio-relay                 # receive, play and forward"
   echo "  meshradio-button                # hold-to-talk"
+  echo "Starting the relay or button service also starts the mesh, which takes the"
+  echo "Wi-Fi away. Keep Ethernet plugged in, or you will lose SSH."
 fi
 echo "Log out and back in once so the audio and gpio groups apply."
