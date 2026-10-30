@@ -57,6 +57,53 @@ The jitter in the ping times (6.6 to 79 ms) is typical of ad-hoc Wi-Fi on two bo
 
 The mesh runs **BATMAN_IV**, the default. The kernel also offers **BATMAN_V**, which estimates link throughput. It was not tried. To try it, set the algorithm before `bat0` exists (`batctl routing_algo BATMAN_V`, or the `routing_algo` module parameter), then bring the mesh up again.
 
+## 3. Installer on two Pi 5 stations (2026-10-30)
+
+`install.sh` was run on both Pis from the repo contents, with `--station 1` on owl-station-1 and `--station 2` on cat-station-2. Both runs exited cleanly.
+
+| Check | Result |
+|---|---|
+| Model detection | Both reported Raspberry Pi 5 Model B |
+| Packages, scripts in `/usr/local/bin`, three systemd units, `/etc/meshradio/station.conf` | Installed on both |
+| `systemd-analyze verify` on the units | No errors |
+| Services at boot | Installed but not enabled, as intended |
+| Updating from the repo and re-running | Worked. The config was rewritten and the old one kept as `station.conf.bak` |
+| Audio device detection | Picked the Sound Blaster on both. Before a USB card was plugged into cat-station-2 it fell back to the HDMI card (card 0), which has no microphone. The installer now falls back to ALSA `default` and prints a warning |
+
+Finding: `meshradio-relay.service` and `meshradio-button.service` both `Want` the mesh service, so starting either one also brings up the mesh. The mesh takes `wlan0`, so a Pi that is reachable only over Wi-Fi drops off the network. Keep Ethernet plugged in while testing over SSH. The installer's closing message now says this.
+
+Not run: the mesh, relay and button as services on a ring.
+
+## 4. Sound Blaster Play! 3 (USB), 2026-10-30
+
+| Test | Result |
+|---|---|
+| Detected as a USB audio card on a Pi 5 | Pass, no driver needed (ALSA card 2). It has a capture and a playback side |
+| Microphone, silence, capture gain 100 % (+30 dB) | Steady floor of about -62 dB RMS |
+| Microphone, talking close to it, gain 100 % | Average about -9 to -14 dB RMS, peaks at 0 dB in nearly every reading. **It clips.** Lower the capture gain to about half for clean speech |
+| Same test on a second card on cat-station-2 | Same result, so the two cards behave alike |
+| Speaker on the green output jack | No sound until the speaker's USB plug was connected for power. Then a 440 Hz tone and the live microphone were heard |
+| Microphone to speaker on the same Pi (about 8 s, and about 5 min) | Heard clearly, no feedback at low volume |
+| Playback of a stereo FLAC file through the speaker | Run on owl-station-1. Heard result not recorded |
+
+After a reboot ALSA restored the card's saved mixer state: speaker volume 47 %, capture gain 100 %.
+
+## 5. Button and NeoPixel ring (2026-10-30)
+
+Wiring is in [`wiring.md`](wiring.md). The scripts are in `tools/`.
+
+| Test | Result |
+|---|---|
+| Button switch between GPIO 17 and ground, `tools/button-test.py` for 20 s | Pass. Idle read "not pressed", and 69 clean press and release events, each press about 0.2 to 0.5 s |
+| NeoPixel ring over SPI, `tools/ring-test.py` and `tools/ring-rainbow.py` | Ran without errors on a Pi 5. SPI was already enabled. The colours on the ring were not confirmed by eye |
+| Button light, blue wire only on GPIO 24 | **No light seen.** `pinctrl` showed GPIO 22, 23 and 24 driven high. Cause not found yet. Check wiring and whether the common pin is a cathode (ground) or an anode (3V3) |
+
+## 6. Network and access notes
+
+- Wi-Fi settings written from another computer while the Pi was running were lost after a power cut: the profile file was 0 bytes. Shut a Pi down with `sudo poweroff` and not by unplugging it.
+- Raspberry Pi OS keeps logs in memory only by default, so the logs from before a reboot are gone. Enable persistent journaling if you need them.
+- The repo was private during these tests, so the Pis cloned it with read-only deploy keys. Once the repo is public this is not needed.
+
 ## Not tested yet
 
 - Three or more stations, and multi-hop routing
@@ -64,6 +111,8 @@ The mesh runs **BATMAN_IV**, the default. The kernel also offers **BATMAN_V**, w
 - The mesh coming back after a reboot with `meshradio-mesh.service`
 - `meshradio-relay` and `meshradio-button` running as services
 - Two-way use: one station speaking while it relays (needs an `audiomixer`)
+- The button light and the colours of the NeoPixel ring (see above)
+- Voice from one Pi to the other over the mesh, with the new Sound Blaster cards
 - A Pi 4
 - BATMAN_V
 - The full `install.sh` on a station (only `--dry-run` was run)
@@ -74,3 +123,7 @@ The mesh runs **BATMAN_IV**, the default. The kernel also offers **BATMAN_V**, w
 - Sending to the same UDP port from two sources at one station mixes two RTP streams in one jitter buffer. This is the reason the `audiomixer` is on the to-do list.
 - The Pi 5 has no analog audio. The USB interface worked without drivers.
 - A Mac cannot join the mesh, because batman-adv is a Linux kernel module. To program the Pis from a computer, use Ethernet or normal Wi-Fi.
+
+## 7. All-in-one demo (button, ring, song)
+
+`tools/demo-song-button.py` checks the button, the NeoPixel ring and the speaker together. Press the button to start a song, press again to stop. The ring shows a flowing rainbow that follows loudness and beats, drawn at 60 frames per second with eased changes, gamma and dithering. Self-test (`--self-test`, 12 s, no button): 747 frames (62 per second), 606 audio readings, 30 beats, no errors. The button light on GPIO 22 to 24 is optional and was not visible in our test, see `docs/wiring.md`. The song is the tester's own file and is not in the repo.

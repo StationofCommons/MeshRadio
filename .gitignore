@@ -1,0 +1,8 @@
+# Media and local files stay out of the repo
+*.flac
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.log
+__pycache__/

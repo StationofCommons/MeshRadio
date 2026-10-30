@@ -12,7 +12,7 @@ A relay station for the Station of Commons installation at ZKM. Each station is 
 
 The same module is built five times for the pilot. Every station runs the same software, and only a short config file differs.
 
-> **Status:** early development. Audio streaming between two Pis and the batman-adv mesh on two Pis were tested on the bench (see [`docs/test-log.md`](docs/test-log.md)). The ring relay, the button and the systemd services are written but not tested yet, and they are marked as such below.
+> **Status:** early development. Audio streaming between two Pis and the batman-adv mesh on two Pis were tested on the bench (see [`docs/test-log.md`](docs/test-log.md)). Wiring is in [`docs/wiring.md`](docs/wiring.md), part notes in [`docs/hardware-notes.md`](docs/hardware-notes.md) and bench scripts in [`tools/`](tools/). The ring relay, the button and the systemd services are written but not tested yet, and they are marked as such below.
 
 ## Two rules of the piece
 
