@@ -6,3 +6,6 @@
 *.m4a
 *.log
 __pycache__/
+
+# Third-party reference models for the case viewer
+case/ref-*/
